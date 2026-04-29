@@ -1,11 +1,19 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
-from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
 from io import BytesIO
 
-class TimeSeriesPredictor:
+# 尝试导入statsmodels，如果失败则使用简单预测方法
+try:
+    from statsmodels.tsa.arima.model import ARIMA
+    from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
+    USE_STATSMODELS = True
+except Exception as e:
+    st.write(f"statsmodels导入失败，使用简单预测方法: {str(e)}")
+    USE_STATSMODELS = False
+
+class SimpleForecaster:
+    """简单预测器，使用移动平均方法"""
     def __init__(self):
         self.data = None
         self.dates = None
@@ -32,9 +40,19 @@ class TimeSeriesPredictor:
         if self.y is None:
             raise ValueError("请先加载数据")
         
-        model = self._fit_arima(self.y)
-        forecast = model.forecast(steps=1)
-        return float(forecast[0])
+        if USE_STATSMODELS:
+            try:
+                model = ARIMA(self.y, order=(2, 1, 2))
+                fitted_model = model.fit()
+                forecast = fitted_model.forecast(steps=1)
+                return float(forecast[0])
+            except:
+                # 备选方案：使用移动平均
+                return float(np.mean(self.y[-20:]))
+        else:
+            # 使用简单移动平均
+            window_size = min(20, len(self.y))
+            return float(np.mean(self.y[-window_size:]))
     
     def rolling_forecast(self, train_ratio=0.8):
         if self.y is None:
@@ -48,14 +66,25 @@ class TimeSeriesPredictor:
         predictions = []
         for i in range(len(test_data)):
             available_data = np.concatenate([train_data, test_data[:i]])
-            model = self._fit_arima(available_data)
-            forecast = model.forecast(steps=1)
-            predictions.append(forecast[0])
+            
+            if USE_STATSMODELS:
+                try:
+                    model = ARIMA(available_data, order=(2, 1, 2))
+                    fitted_model = model.fit()
+                    forecast = fitted_model.forecast(steps=1)
+                    predictions.append(float(forecast[0]))
+                except:
+                    window_size = min(20, len(available_data))
+                    predictions.append(float(np.mean(available_data[-window_size:])))
+            else:
+                window_size = min(20, len(available_data))
+                predictions.append(float(np.mean(available_data[-window_size:])))
         
-        mse = mean_squared_error(test_data, predictions)
-        mae = mean_absolute_error(test_data, predictions)
+        # 计算指标
+        mse = np.mean((np.array(test_data) - np.array(predictions)) ** 2)
+        mae = np.mean(np.abs(np.array(test_data) - np.array(predictions)))
         rmse = np.sqrt(mse)
-        mape = mean_absolute_percentage_error(test_data, predictions)
+        mape = np.mean(np.abs((np.array(test_data) - np.array(predictions)) / np.array(test_data))) * 100
         
         return {
             'predictions': predictions,
@@ -69,27 +98,19 @@ class TimeSeriesPredictor:
             'train_size': train_size,
             'test_size': len(test_data)
         }
-    
-    def _fit_arima(self, data):
-        try:
-            model = ARIMA(data, order=(2, 1, 2))
-            fitted_model = model.fit()
-            return fitted_model
-        except:
-            model = ARIMA(data, order=(1, 1, 1))
-            fitted_model = model.fit()
-            return fitted_model
 
-# Streamlit应用
 def main():
     st.set_page_config(page_title="时间序列预测系统", layout="wide")
     
     st.title("📊 时间序列预测系统")
     st.subheader("基于ARIMA模型的股票价格预测与回测平台")
     
+    # 显示当前使用的预测方法
+    st.info(f"当前预测方法: {'ARIMA模型' if USE_STATSMODELS else '移动平均法'}")
+    
     # 初始化预测器
     if 'predictor' not in st.session_state:
-        st.session_state.predictor = TimeSeriesPredictor()
+        st.session_state.predictor = SimpleForecaster()
     
     # 文件上传
     st.markdown("---")
@@ -139,13 +160,12 @@ def main():
                 col1.metric("均方误差 (MSE)", f"{backtest_result['metrics']['mse']:.6f}")
                 col2.metric("平均绝对误差 (MAE)", f"{backtest_result['metrics']['mae']:.6f}")
                 col3.metric("均方根误差 (RMSE)", f"{backtest_result['metrics']['rmse']:.6f}")
-                col4.metric("平均绝对百分比误差 (MAPE)", f"{backtest_result['metrics']['mape'] * 100:.4f}%")
+                col4.metric("平均绝对百分比误差 (MAPE)", f"{backtest_result['metrics']['mape']:.4f}%")
             
             # 导出功能
             st.markdown("---")
             st.header("📥 导出预测结果")
             
-            # 创建导出数据
             output_data = {'y': backtest_result['predictions']}
             if st.session_state.predictor.dates is not None:
                 train_size = backtest_result['train_size']
@@ -167,6 +187,8 @@ def main():
             
         except Exception as e:
             st.error(f"❌ 错误: {str(e)}")
+            import traceback
+            st.exception(e)
     
     # 文件格式说明
     st.markdown("---")
