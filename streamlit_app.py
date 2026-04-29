@@ -6,14 +6,12 @@ from io import BytesIO
 # 尝试导入statsmodels，如果失败则使用简单预测方法
 try:
     from statsmodels.tsa.arima.model import ARIMA
-    from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
     USE_STATSMODELS = True
 except Exception as e:
-    st.write(f"statsmodels导入失败，使用简单预测方法: {str(e)}")
     USE_STATSMODELS = False
 
 class SimpleForecaster:
-    """简单预测器，使用移动平均方法"""
+    """简单预测器，使用移动平均方法作为备选"""
     def __init__(self):
         self.data = None
         self.dates = None
@@ -80,20 +78,23 @@ class SimpleForecaster:
                 window_size = min(20, len(available_data))
                 predictions.append(float(np.mean(available_data[-window_size:])))
         
-        # 计算指标
-        mse = np.mean((np.array(test_data) - np.array(predictions)) ** 2)
-        mae = np.mean(np.abs(np.array(test_data) - np.array(predictions)))
-        rmse = np.sqrt(mse)
-        mape = np.mean(np.abs((np.array(test_data) - np.array(predictions)) / np.array(test_data))) * 100
+        # 使用纯Python计算指标
+        test_array = np.array(test_data)
+        pred_array = np.array(predictions)
+        
+        mse = float(np.mean((test_array - pred_array) ** 2))
+        mae = float(np.mean(np.abs(test_array - pred_array)))
+        rmse = float(np.sqrt(mse))
+        mape = float(np.mean(np.abs((test_array - pred_array) / test_array)) * 100)
         
         return {
             'predictions': predictions,
             'test_data': test_data.tolist(),
             'metrics': {
-                'mse': float(mse),
-                'mae': float(mae),
-                'rmse': float(rmse),
-                'mape': float(mape)
+                'mse': mse,
+                'mae': mae,
+                'rmse': rmse,
+                'mape': mape
             },
             'train_size': train_size,
             'test_size': len(test_data)
