@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时间序列预测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        .upload-area.dragover {
+            background: #d8dbff;
+            border-color: #764ba2;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .upload-text strong {
+            color: #667eea;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            border-left: 4px solid #4caf50;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-info h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .file-info p {
+            color: #388e3c;
+            margin: 5px 0;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(56, 239, 125, 0.4);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(109, 213, 237, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+        }
+
+        .result-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .result-value {
+            font-size: 1.5em;
+            color: #764ba2;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .metric-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            color: #667eea;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4caf50;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .info-section {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .info-section h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .info-section ul {
+            margin-left: 20px;
+            color: #0d47a1;
+        }
+
+        .info-section li {
+            margin: 5px 0;
+        }
+
+        .auto-processing {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #e65100;
+            display: none;
+        }
+
+        .auto-processing.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 时间序列预测系统</h1>
+            <p>基于ARIMA模型的股票价格预测与回测平台</p>
+        </div>
+
+        <div class="card">
+            <h2>📁 数据上传</h2>
+            
+            <div class="info-section">
+                <h4>📋 文件格式要求：</h4>
+                <ul>
+                    <li>文件类型：.xlsx 格式</li>
+                    <li>必填列：名为 "y" 的列（时间序列数据）</li>
+                    <li>可选列：名为 "date" 的列（日期信息）</li>
+                    <li>数据要求：y列不能有缺失值，按时间从早到晚排序</li>
+                </ul>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">
+                    <strong>点击上传</strong> 或拖拽Excel文件到此处<br>
+                    <small>支持 .xlsx 格式</small>
+                </div>
+                <input type="file" id="fileInput" accept=".xlsx">
+            </div>
+
+            <div class="file-info" id="fileInfo">
+                <h3>✅ 文件上传成功</h3>
+                <p><strong>文件名：</strong><span id="fileName"></span></p>
+                <p><strong>样本数量：</strong><span id="sampleCount"></span></p>
+                <p><strong>均值：</strong><span id="meanValue"></span></p>
+                <p><strong>标准差：</strong><span id="stdValue"></span></p>
+                <p><strong>最小值：</strong><span id="minValue"></span></p>
+                <p><strong>最大值：</strong><span id="maxValue"></span></p>
+                <p><strong>包含日期列：</strong><span id="hasDates"></span></p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+        </div>
+
+        <div class="card">
+            <h2>🔮 一步向前预测</h2>
+            <div class="auto-processing" id="forecastProcessing">
+                ⏳ 文件上传成功，正在自动执行一步向前预测...
+            </div>
+            <p style="color: #666; margin-bottom: 15px;">
+                使用全部历史数据预测下一个时间点的值
+            </p>
+            
+            <div class="loading" id="forecastLoading">
+                <div class="spinner"></div>
+                <p>正在预测中...</p>
+            </div>
+            
+            <div class="result-box" id="forecastResult">
+                <h3>预测结果</h3>
+                <div class="result-value" id="forecastValue"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📈 回测检验</h2>
+            <div class="auto-processing" id="backtestProcessing">
+                ⏳ 一步预测完成，正在自动执行回测检验...
+            </div>
+            <p style="color: #666; margin-bottom: 15px;">
+                使用80%数据作为训练集，20%作为测试集进行滚动预测
+            </p>
+            
+            <div class="loading" id="backtestLoading">
+                <div class="spinner"></div>
+                <p>正在回测中...</p>
+            </div>
+            
+            <div class="result-box" id="backtestResult">
+                <h3>回测结果</h3>
+                <p><strong>训练集大小：</strong><span id="trainSize"></span></p>
+                <p><strong>测试集大小：</strong><span id="testSize"></span></p>
+                
+                <h4 style="margin-top: 20px; color: #667eea;">预测评估指标</h4>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <div class="metric-label">均方误差 (MSE)</div>
+                        <div class="metric-value" id="mseValue"></div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">平均绝对误差 (MAE)</div>
+                        <div class="metric-value" id="maeValue"></div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">均方根误差 (RMSE)</div>
+                        <div class="metric-value" id="rmseValue"></div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">平均绝对百分比误差 (MAPE)</div>
+                        <div class="metric-value" id="mapeValue"></div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-info" id="exportBtn">
+                        📥 导出预测结果
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let fileUploaded = false;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.endsWith('.xlsx')) {
+                showError('只支持 .xlsx 格式的文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading(true);
+            
+            fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                
+                if (data.success) {
+                    showSuccess(data.message);
+                    displayFileInfo(data.summary);
+                    fileUploaded = true;
+                    
+                    // 文件上传成功后自动执行一步向前预测
+                    autoForecast();
+                } else {
+                    showError(data.error || '上传失败');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showError('上传失败：' + error.message);
+            });
+        }
+
+        function displayFileInfo(summary) {
+            document.getElementById('fileName').textContent = fileInput.files[0]?.name || '未知文件';
+            document.getElementById('sampleCount').textContent = summary.n_samples;
+            document.getElementById('meanValue').textContent = summary.mean.toFixed(6);
+            document.getElementById('stdValue').textContent = summary.std.toFixed(6);
+            document.getElementById('minValue').textContent = summary.min.toFixed(6);
+            document.getElementById('maxValue').textContent = summary.max.toFixed(6);
+            document.getElementById('hasDates').textContent = summary.has_dates ? '是' : '否';
+            
+            fileInfo.classList.add('show');
+        }
+
+        function autoForecast() {
+            document.getElementById('forecastProcessing').classList.add('show');
+            document.getElementById('forecastLoading').classList.add('show');
+            document.getElementById('forecastResult').classList.remove('show');
+
+            fetch(`${API_BASE}/forecast`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('forecastLoading').classList.remove('show');
+                document.getElementById('forecastProcessing').classList.remove('show');
+                
+                if (data.success) {
+                    document.getElementById('forecastValue').textContent = data.forecast.toFixed(6);
+                    document.getElementById('forecastResult').classList.add('show');
+                    showSuccess(data.message);
+                    
+                    // 一步预测完成后自动执行回测
+                    autoBacktest();
+                } else {
+                    showError(data.error || '预测失败');
+                }
+            })
+            .catch(error => {
+                document.getElementById('forecastLoading').classList.remove('show');
+                document.getElementById('forecastProcessing').classList.remove('show');
+                showError('预测失败：' + error.message);
+            });
+        }
+
+        function autoBacktest() {
+            document.getElementById('backtestProcessing').classList.add('show');
+            document.getElementById('backtestLoading').classList.add('show');
+            document.getElementById('backtestResult').classList.remove('show');
+
+            fetch(`${API_BASE}/backtest`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('backtestLoading').classList.remove('show');
+                document.getElementById('backtestProcessing').classList.remove('show');
+                
+                if (data.success) {
+                    const result = data.result;
+                    document.getElementById('trainSize').textContent = result.train_size;
+                    document.getElementById('testSize').textContent = result.test_size;
+                    document.getElementById('mseValue').textContent = result.metrics.mse.toFixed(6);
+                    document.getElementById('maeValue').textContent = result.metrics.mae.toFixed(6);
+                    document.getElementById('rmseValue').textContent = result.metrics.rmse.toFixed(6);
+                    document.getElementById('mapeValue').textContent = (result.metrics.mape * 100).toFixed(4) + '%';
+                    document.getElementById('backtestResult').classList.add('show');
+                    showSuccess(data.message);
+                } else {
+                    showError(data.error || '回测失败');
+                }
+            })
+            .catch(error => {
+                document.getElementById('backtestLoading').classList.remove('show');
+                document.getElementById('backtestProcessing').classList.remove('show');
+                showError('回测失败：' + error.message);
+            });
+        }
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!fileUploaded) {
+                showError('请先上传数据文件');
+                return;
+            }
+
+            window.location.href = `${API_BASE}/export`;
+            showSuccess('正在下载预测结果文件...');
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            successMessage.classList.remove('show');
+            
+            setTimeout(() => {
+                errorMessage.classList.remove('show');
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.classList.add('show');
+            errorMessage.classList.remove('show');
+            
+            setTimeout(() => {
+                successMessage.classList.remove('show');
+            }, 3000);
+        }
+
+        function showLoading(show) {
+            if (show) {
+                uploadArea.style.opacity = '0.5';
+                uploadArea.style.pointerEvents = 'none';
+            } else {
+                uploadArea.style.opacity = '1';
+                uploadArea.style.pointerEvents = 'auto';
+            }
+        }
+    </script>
+</body>
+</html>
